@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Captura e Processamento de Imagem</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            background-color: #f0f0f0;
+            margin: 0;
+            padding: 20px;
+        }
+        #video {
+            width: 100%;
+            max-width: 640px;
+            border: 1px solid #ddd;
+            margin-bottom: 20px;
+        }
+        #resultCanvas {
+            width: 100%;
+            max-width: 640px;
+            border: 1px solid #ddd;
+        }
+    </style>
+</head>
+<body>
+    <h1>Captura e Processamento de Imagem com MediaPipe</h1>
+    <video id="video" autoplay></video>
+    <canvas id="resultCanvas"></canvas>
+
+    <script>
+        function start() {
+            const video = document.querySelector("#video");
+
+            // Solicita permissão e captura o vídeo da câmera
+            navigator.mediaDevices.getUserMedia({ video: true })
+                .then(stream => {
+                    video.srcObject = stream;
+                   
+                })
+                .catch(error => {
+                    console.error('Erro ao acessar a câmera:', error);
+                });
+        }
+
+        function captureAndSend() {
+            const video = document.querySelector("#video");
+            const canvas = document.createElement("canvas");
+            const context = canvas.getContext("2d");
+
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+
+            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+            const imageData = canvas.toDataURL("image/png");
+
+            fetch('/process_frame', {
+                method: 'POST',
+                body: JSON.stringify({ image: imageData }),
+                headers: { 'Content-Type': 'application/json' }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    console.error('Erro no processamento da imagem', data.error);
+                    return;
+                }
+                const img = new Image();
+                img.onload = () => {
+                    const resultCanvas = document.querySelector("#resultCanvas");
+                    const resultContext = resultCanvas.getContext("2d");
+                    resultCanvas.width = img.width;
+                    resultCanvas.height = img.height;
+                    resultContext.clearRect(0, 0, resultCanvas.width, resultCanvas.height);
+                    resultContext.drawImage(img, 0, 0);
+                };
+                img.src = 'data:image/png;base64,' + data.image;
+            })
+            .catch(error => {
+                console.error('Erro no envio de frame', error);
+            });
+        }
+
+        window.addEventListener("DOMContentLoaded", () => {
+            start();
+            setInterval(captureAndSend, 100); 
+        });
+    </script>
+</body>
+</html>
